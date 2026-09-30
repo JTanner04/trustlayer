@@ -1,0 +1,80 @@
+.page {
+  --ink: #182f2c;
+  --muted: #5e706a;
+  --line: #dbe4dc;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  color: var(--ink);
+  background: #f7f9f5;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+.page a:focus-visible { outline: 3px solid #b65b33; outline-offset: 5px; }
+.skipLink { position: absolute; top: 12px; left: 20px; z-index: 10; padding: 12px 20px; border-radius: 8px; background: white; transform: translateY(-180%); }
+.skipLink:focus { transform: translateY(0); }
+.header { flex-shrink: 0; width: min(1216px, calc(100% - 96px)); min-height: 94px; margin-inline: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
+.brand { display: inline-flex; align-items: center; font-size: 23px; font-weight: 700; letter-spacing: -.9px; }
+.brandMark { display: grid; place-items: center; width: 36px; height: 36px; margin-right: 10px; border-radius: 9px; background: var(--ink); color: #d4efc4; }
+.brandDot { color: #a44e2f; }
+.backButton { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 9px 15px; border: 1px solid #cad6cb; border-radius: 7px; font-size: 12px; font-weight: 550; transition: background 180ms, border-color 180ms; }
+.backButton svg { width: 16px; height: 16px; }
+.backButton:hover { background: #eaf0e5; border-color: #a9bba5; }
+.formStage { flex: 1; display: grid; place-items: center; width: 100%; min-width: 0; padding: 32px 20px; }
+.formCard { width: 100%; max-width: 440px; min-width: 0; border: 1px solid #d5dfd1; border-radius: 16px; background: #fff; box-shadow: 0 22px 65px -35px #233e3133; animation: appear 550ms both; }
+.formPanel { min-width: 0; padding: 30px 34px; }
+.formTop { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.accountIcon { display: grid; place-items: center; width: 39px; height: 39px; flex-shrink: 0; border: 1px solid #d7e2cf; border-radius: 10px; color: #436a37; background: #f0f5e9; }
+.eyebrow { font-family: var(--font-geist-mono), monospace; font-size: 8px; line-height: 1.8; letter-spacing: 1px; }
+.eyebrow { color: var(--muted); }
+.formHeading h1 { margin-top: 10px; font-size: 30px; font-weight: 550; line-height: 1.2; letter-spacing: -1.3px; }
+.description { max-width: 350px; margin-top: 13px; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.fields { display: grid; gap: 16px; margin-top: 24px; }
+.field { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.field label { font-size: 12px; font-weight: 550; }
+.field input { width: 100%; min-width: 0; min-height: 47px; padding: 11px 14px; border: 1px solid #d6dfd2; border-radius: 7px; background: #fcfdfa; color: var(--ink); font-family: inherit; font-size: 16px; line-height: 1.5; transition: border-color 180ms, box-shadow 180ms; }
+.field input::placeholder { color: #778173; font-size: 13px; }
+.field input:hover { border-color: #aabfa2; }
+.field input:focus-visible { outline: 2px solid #416e52; outline-offset: 2px; border-color: #416e52; box-shadow: 0 0 0 4px #e7f0e2; background: white; }
+.submitButton { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 4px; padding: 12px; border: 1px solid #60796a; border-radius: 7px; background: #60796a; color: #fff; font-size: 13px; font-weight: 550; }
+.submitButton:disabled { cursor: not-allowed; }
+.submitButton svg { width: 16px; height: 16px; }
+.previewNote { display: flex; align-items: flex-start; gap: 8px; margin-top: 13px; font-size: 10px; line-height: 1.7; color: var(--muted); }
+.previewDot { width: 5px; height: 5px; margin-top: 6px; flex-shrink: 0; border-radius: 50%; background: #b2603c; }
+.previewNote strong { display: inline; margin-right: 6px; font-weight: 550; color: #58674e; }
+.switchAccount { margin-top: 25px; padding-top: 22px; border-top: 1px solid #e4eade; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.switchAccount a { display: inline-flex; align-items: center; gap: 5px; color: #2c6653; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.switchAccount a:hover { color: #a44e2f; }
+.switchAccount svg { width: 13px; height: 13px; }
+.footer { flex-shrink: 0; padding: 0 20px 27px; text-align: center; font-size: 10px; line-height: 1.8; color: var(--muted); }
+.footer > span { margin-right: 7px; font-weight: 600; color: var(--ink); }
+@keyframes appear { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 1050px) {
+  .header { width: calc(100% - 64px); }
+  .formHeading h1 { font-size: 29px; }
+}
+@media (max-width: 760px) {
+  .formStage { padding-block: 24px; }
+}
+@media (max-width: 450px) {
+  .header { width: calc(100% - 40px); min-height: 80px; gap: 10px; }
+  .brand { font-size: 18px; }
+  .brandMark { width: 28px; height: 30px; margin-right: 6px; border-radius: 7px; }
+  .brandMark svg { width: 18px; height: 18px; }
+  .backButton { gap: 6px; padding: 9px; font-size: 10px; }
+  .backButton svg { width: 13px; height: 13px; }
+  .formPanel { padding: 26px 23px; }
+  .formHeading h1 { font-size: 29px; }
+  .eyebrow { font-size: 7px; letter-spacing: .6px; }
+  .description { font-size: 12px; }
+  .fields { gap: 16px; margin-top: 24px; }
+  .previewNote strong { display: block; }
+  .switchAccount { font-size: 11px; }
+}
+@media (max-width: 350px) {
+  .header { flex-wrap: wrap; gap: 12px; padding-block: 16px; }
+  .backButton { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page *, .page *::before, .page *::after { animation: none !important; transition: none !important; }
+}
