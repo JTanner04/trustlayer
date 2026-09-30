@@ -78,7 +78,7 @@ export default function AuthScreen({ mode }: { mode: "login" | "signup" }) {
 
             <div className={styles.previewNote} id="preview-note">
               <span className={styles.previewDot} />
-              <p><strong>Frontend preview</strong>Account {isSignup ? "creation" : "login"} isn’t connected yet.</p>
+              <p><strong>Frontend preview</strong>Account {isSignup ? "creation" : "login"} isn’t connected yet. <Link href="/dashboard" className="font-semibold underline underline-offset-4">Explore the dashboard preview</Link></p>
             </div>
             <p className={styles.switchAccount}>
               {isSignup ? "Already have an account? " : "New to TrustLayer? "}
