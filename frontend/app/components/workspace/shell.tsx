@@ -67,7 +67,7 @@ function Workspace({ children }: { children: ReactNode }) {
             <Avatar name={profile.display_name} />
             <span>
               <strong>{profile.display_name}</strong>
-              <small>Sample account</small>
+              <small>Signed-in account</small>
             </span>
             <Icon name="settings" />
           </Link>
@@ -81,14 +81,14 @@ function Workspace({ children }: { children: ReactNode }) {
           </span>
           <span className={s.previewPill}>
             <span />
-            UI PREVIEW
+            LIVE DATA
           </span>
         </header>
         <div className={s.previewBanner}>
           <span>
-            Sample workspace. Try the flow—changes reset when you refresh.
+            Your TrustLayer workspace is connected to your account.
           </span>
-          <span>No live account or blockchain activity</span>
+          <span>Blockchain verification is still in development</span>
         </div>
         <main id="workspace-content" className={s.content} key={path}>
           {children}

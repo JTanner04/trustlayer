@@ -24,7 +24,8 @@ default. Use `GET /health` to confirm it is running.
 1. `POST /auth/register` with `email`, `password` (12+ characters), and `display_name`.
 2. `POST /auth/login` returns a bearer token.
 3. Use `Authorization: Bearer <token>` for profile changes, agreements, and reviews.
-4. `POST /agreements` creates an agreement; either participant can call
+4. `POST /agreements` creates an agreement. The invited participant calls
+   `POST /agreements/{id}/accept`; either participant can then call
    `POST /agreements/{id}/complete`.
 5. A participant may then `POST /reviews` once for that agreement.
 
@@ -32,3 +33,9 @@ default. Use `GET /health` to confirm it is running.
 `GET /reviews/{id}/verification` returns the review's verification state and Solana transaction field. Reviews begin as
 `pending`; a Solana signer/RPC worker will update the record to `verified` and
 write its transaction signature after it submits the on-chain verification record.
+
+Authenticated list and detail routes are available for workspace integration:
+
+- `GET /agreements` (optional `?status=open` or `?status=completed`)
+- `GET /agreements/{id}`
+- `GET /reviews?scope=received` and `GET /reviews?scope=given`

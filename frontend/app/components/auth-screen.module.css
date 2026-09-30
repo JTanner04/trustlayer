@@ -37,8 +37,11 @@
 .field input:hover { border-color: #aabfa2; }
 .field input:focus-visible { outline: 2px solid #416e52; outline-offset: 2px; border-color: #416e52; box-shadow: 0 0 0 4px #e7f0e2; background: white; }
 .submitButton { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 4px; padding: 12px; border: 1px solid #60796a; border-radius: 7px; background: #60796a; color: #fff; font-size: 13px; font-weight: 550; }
-.submitButton:disabled { cursor: not-allowed; }
+.submitButton:not(:disabled) { cursor: pointer; transition: background 180ms, transform 180ms; }
+.submitButton:not(:disabled):hover { background: #365f4a; transform: translateY(-1px); }
+.submitButton:disabled { cursor: wait; opacity: .72; }
 .submitButton svg { width: 16px; height: 16px; }
+.formError { margin: -3px 0 0; padding: 10px 12px; border: 1px solid #e4c9bd; border-radius: 7px; background: #fff6f2; color: #963f23; font-size: 11px; line-height: 1.55; }
 .previewNote { display: flex; align-items: flex-start; gap: 8px; margin-top: 13px; font-size: 10px; line-height: 1.7; color: var(--muted); }
 .previewDot { width: 5px; height: 5px; margin-top: 6px; flex-shrink: 0; border-radius: 50%; background: #b2603c; }
 .previewNote strong { display: inline; margin-right: 6px; font-weight: 550; color: #58674e; }

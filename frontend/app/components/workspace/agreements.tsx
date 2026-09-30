@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { usePreview } from "./preview-context";
-import { CURRENT_USER, counterpart, formatDate, people, person } from "./model";
+import { CURRENT_USER, counterpart, formatDate, person } from "./model";
 import {
   AgreementTable,
   Avatar,
@@ -102,7 +102,7 @@ export function NewAgreement() {
   const { createAgreement } = usePreview();
   const router = useRouter();
   const [error, setError] = useState("");
-  function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const title = String(data.get("title") ?? "").trim();
@@ -115,12 +115,12 @@ export function NewAgreement() {
       participant_id === CURRENT_USER
     )
       return setError("Enter another participant’s valid user ID.");
-    const id = createAgreement({
-      title,
-      participant_id,
-      description: String(data.get("description") ?? ""),
-    });
-    router.push(`/agreements/${id}`);
+    try {
+      const id = await createAgreement({ title, participant_id, description: String(data.get("description") ?? "") });
+      router.push(`/agreements/${id}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not create agreement.");
+    }
   }
   return (
     <>
@@ -153,36 +153,13 @@ export function NewAgreement() {
             <input
               name="participant"
               required
-              list="sample-participants"
-              placeholder="Select a sample person or paste a user ID"
+              placeholder="Paste another TrustLayer user’s ID"
               aria-describedby="participant-help"
             />
             <span id="participant-help">
-              Use a sample collaborator below, or enter another user’s UUID.
+              Ask your collaborator for the user ID shown in their profile settings.
             </span>
           </label>
-          <datalist id="sample-participants">
-            {people
-              .filter((p) => p.id !== CURRENT_USER)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </datalist>
-          <div className={s.samplePeople}>
-            {people
-              .filter((p) => p.id !== CURRENT_USER)
-              .map((p) => (
-                <div key={p.id}>
-                  <Avatar name={p.name} />
-                  <span>
-                    <strong>{p.name}</strong>
-                    <small>{p.id}</small>
-                  </span>
-                </div>
-              ))}
-          </div>
           <label className={s.field}>
             Description <span className={s.optional}>Optional</span>
             <textarea
@@ -201,7 +178,7 @@ export function NewAgreement() {
               Cancel
             </Link>
             <button className={s.primary} type="submit">
-              Create sample agreement
+              Create agreement
               <Icon name="arrow" />
             </button>
           </div>
@@ -219,7 +196,7 @@ export function NewAgreement() {
             <li>Each person can then leave one review.</li>
           </ol>
           <p className={s.footnote}>
-            This creates a temporary preview. Nothing is sent to the API.
+            The invited participant must accept before either person can mark this complete.
           </p>
         </aside>
       </div>
@@ -270,9 +247,9 @@ export function AgreementDetail() {
               <div>
                 <span className={s.smallLabel}>YOU</span>
                 <div className={s.personCell}>
-                  <Avatar name="Marcus Chen" />
+                  <Avatar name="You" />
                   <span>
-                    Sample account<small>Participant</small>
+                    Your account<small>Participant</small>
                   </span>
                 </div>
               </div>
@@ -306,8 +283,8 @@ export function AgreementDetail() {
             {a.status === "open" ? (
               confirm ? (
                 <div className={s.confirmation}>
-                  <strong>Mark this sample agreement complete?</strong>
-                  <p>You won’t be able to reopen it in this preview.</p>
+                  <strong>Mark this agreement complete?</strong>
+                  <p>You won’t be able to reopen it after confirming.</p>
                   <div className={s.inlineActions}>
                     <button
                       className={s.primary}

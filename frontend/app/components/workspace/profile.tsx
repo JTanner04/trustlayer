@@ -14,10 +14,10 @@ export function PublicProfile() {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setMessage(
-        "Preview link copied. It opens the sample profile, not a live account.",
+        "Profile link copied.",
       );
     } catch {
-      setMessage("Copy the address from your browser to share this preview.");
+      setMessage("Copy the address from your browser to share your profile.");
     }
   }
   return (
@@ -25,7 +25,7 @@ export function PublicProfile() {
       <Heading
         eyebrow="SEE WHAT OTHERS WILL SEE"
         title="Your public profile"
-        description="A preview of your work history and the feedback behind it."
+        description="Your work history and the feedback behind it."
         action={
           <Link className={s.secondary} href="/settings">
             <Icon name="settings" />
@@ -39,7 +39,7 @@ export function PublicProfile() {
             <Icon name="layers" />
             TRUSTLAYER REPUTATION PROFILE
           </span>
-          <span>SAMPLE PROFILE</span>
+          <span>PUBLIC PROFILE</span>
         </div>
         <div className={s.publicIdentity}>
           <Avatar name={profile.display_name} large />
@@ -53,7 +53,7 @@ export function PublicProfile() {
           </div>
           <button className={s.secondary} onClick={copy}>
             <Icon name="external" />
-            Copy preview link
+            Copy profile link
           </button>
         </div>
         {message && (
@@ -121,10 +121,10 @@ export function PublicProfile() {
 }
 
 export function ProfileSettings() {
-  const { profile, saveProfile } = usePreview();
+  const { profile, currentUserId, saveProfile } = usePreview();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const display_name = String(data.get("display_name") ?? "").trim();
@@ -142,13 +142,14 @@ export function ProfileSettings() {
         "Enter a Solana-style public address (32–44 base58 characters), or leave it blank.",
       );
     }
-    saveProfile({
-      display_name,
-      bio: String(data.get("bio") ?? "").trim(),
-      wallet_address,
-    });
-    setError("");
-    setMessage("Profile updated in this preview. Changes reset on refresh.");
+    try {
+      await saveProfile({ display_name, bio: String(data.get("bio") ?? "").trim(), wallet_address });
+      setError("");
+      setMessage("Profile updated.");
+    } catch (reason) {
+      setMessage("");
+      setError(reason instanceof Error ? reason.message : "Could not save profile.");
+    }
   }
   return (
     <>
@@ -207,7 +208,7 @@ export function ProfileSettings() {
               Solana wallet address
             </h2>
             <p>
-              Add a public address to preview the profile field. This does not
+              Add a public address to your profile. This does not
               connect a wallet or prove ownership.
             </p>
           </div>
@@ -241,7 +242,7 @@ export function ProfileSettings() {
               Cancel
             </Link>
             <button className={s.primary} type="submit">
-              Save preview changes
+              Save profile changes
               <Icon name="check" />
             </button>
           </div>
@@ -254,8 +255,8 @@ export function ProfileSettings() {
             introduction to the work you do.
           </p>
           <div className={s.divider} />
-          <p className={s.smallLabel}>YOUR SAMPLE USER ID</p>
-          <code className={s.code}>{CURRENT_USER}</code>
+          <p className={s.smallLabel}>YOUR USER ID</p>
+          <code className={s.code}>{currentUserId || "Loading…"}</code>
           <p className={s.footnote}>
             Other people will use your user ID when creating an agreement with
             you.

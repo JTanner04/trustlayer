@@ -152,15 +152,19 @@ export function WriteReview() {
       </Empty>
     );
   const agreement = a;
-  function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const text = String(
       new FormData(e.currentTarget).get("review") ?? "",
     ).trim();
     if (!rating || !text)
       return setError("Choose a rating and describe your experience.");
-    addReview(agreement.id, rating, text);
-    router.push(`/agreements/${agreement.id}`);
+    try {
+      await addReview(agreement.id, rating, text);
+      router.push(`/agreements/${agreement.id}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not submit review.");
+    }
   }
   return (
     <>
@@ -236,7 +240,7 @@ export function WriteReview() {
               Cancel
             </Link>
             <button className={s.primary}>
-              Submit sample review
+              Submit review
               <Icon name="arrow" />
             </button>
           </div>
@@ -256,8 +260,7 @@ export function WriteReview() {
             verifiable.
           </p>
           <p className={s.footnote}>
-            Preview submissions remain pending. No blockchain transaction is
-            sent.
+            Reviews begin pending verification. No blockchain transaction is sent yet.
           </p>
         </aside>
       </div>
@@ -272,7 +275,7 @@ export function Verification() {
   if (!r)
     return (
       <Empty title="Review record not found">
-        <p>Sample reviews you create reset on refresh.</p>
+        <p>This review could not be found in your account.</p>
         <Link className={s.secondary} href="/reviews">
           Back to reviews
         </Link>

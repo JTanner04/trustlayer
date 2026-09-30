@@ -1,12 +1,12 @@
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header::AUTHORIZATION},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
 use bcrypt::{DEFAULT_COST, hash, verify};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, postgres::PgPoolOptions};
@@ -62,6 +62,11 @@ struct PublicProfile {
     profile: Profile,
     reviews: Vec<Review>,
 }
+#[derive(Serialize)]
+struct Me {
+    user: User,
+    profile: Profile,
+}
 #[derive(Deserialize)]
 struct UpdateProfile {
     display_name: String,
@@ -76,12 +81,19 @@ struct Agreement {
     title: String,
     description: String,
     status: String,
+    accepted_at: Option<DateTime<Utc>>,
+    completed_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
 }
 #[derive(Deserialize)]
 struct CreateAgreement {
     participant_id: Uuid,
     title: String,
     description: String,
+}
+#[derive(Deserialize)]
+struct AgreementQuery {
+    status: Option<String>,
 }
 #[derive(Serialize, FromRow)]
 struct Review {
@@ -93,12 +105,17 @@ struct Review {
     review_text: String,
     verification_status: String,
     blockchain_transaction: Option<String>,
+    created_at: DateTime<Utc>,
 }
 #[derive(Deserialize)]
 struct CreateReview {
     agreement_id: Uuid,
     rating: i16,
     review_text: String,
+}
+#[derive(Deserialize)]
+struct ReviewQuery {
+    scope: Option<String>,
 }
 
 struct ApiError(StatusCode, String);
@@ -168,10 +185,13 @@ async fn main() {
         .route("/health", get(health))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
+        .route("/me", get(me))
         .route("/profiles/{user_id}", get(profile).put(update_profile))
-        .route("/agreements", post(create_agreement))
+        .route("/agreements", get(list_agreements).post(create_agreement))
+        .route("/agreements/{id}", get(agreement))
+        .route("/agreements/{id}/accept", post(accept_agreement))
         .route("/agreements/{id}/complete", post(complete_agreement))
-        .route("/reviews", post(create_review))
+        .route("/reviews", get(list_reviews).post(create_review))
         .route("/reviews/{id}/verification", get(verification))
         .with_state(state)
         .layer(CorsLayer::permissive())
@@ -255,6 +275,23 @@ async fn login(
         },
     }))
 }
+async fn me(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Json<Me>> {
+    let id = actor(&headers, &s)?;
+    let user = sqlx::query_as("SELECT id,email FROM users WHERE id=$1")
+        .bind(id)
+        .fetch_optional(&s.db)
+        .await
+        .map_err(internal)?
+        .ok_or_else(|| ApiError(StatusCode::UNAUTHORIZED, "account not found".into()))?;
+    let profile = sqlx::query_as(
+        "SELECT user_id,display_name,bio,wallet_address FROM profiles WHERE user_id=$1",
+    )
+    .bind(id)
+    .fetch_one(&s.db)
+    .await
+    .map_err(internal)?;
+    Ok(Json(Me { user, profile }))
+}
 async fn profile(
     State(s): State<AppState>,
     Path(user_id): Path<Uuid>,
@@ -267,7 +304,7 @@ async fn profile(
     .await
     .map_err(internal)?
     .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "profile not found".into()))?;
-    let reviews = sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction FROM reviews WHERE reviewed_user_id=$1 ORDER BY created_at DESC")
+    let reviews = sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at FROM reviews WHERE reviewed_user_id=$1 ORDER BY created_at DESC")
         .bind(user_id)
         .fetch_all(&s.db)
         .await
@@ -298,8 +335,45 @@ async fn create_agreement(
         return Err(bad("an agreement needs another participant and a title"));
     }
     let id = Uuid::new_v4();
-    let agreement=sqlx::query_as("INSERT INTO agreements (id,creator_id,participant_id,title,description) VALUES ($1,$2,$3,$4,$5) RETURNING id,creator_id,participant_id,title,description,status").bind(id).bind(creator_id).bind(input.participant_id).bind(input.title.trim()).bind(input.description.trim()).fetch_one(&s.db).await.map_err(internal)?;
+    let agreement=sqlx::query_as("INSERT INTO agreements (id,creator_id,participant_id,title,description) VALUES ($1,$2,$3,$4,$5) RETURNING id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at").bind(id).bind(creator_id).bind(input.participant_id).bind(input.title.trim()).bind(input.description.trim()).fetch_one(&s.db).await.map_err(internal)?;
     Ok((StatusCode::CREATED, Json(agreement)))
+}
+async fn list_agreements(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<AgreementQuery>,
+) -> ApiResult<Json<Vec<Agreement>>> {
+    let user = actor(&headers, &s)?;
+    if let Some(status) = query.status {
+        if status != "open" && status != "completed" {
+            return Err(bad("status must be open or completed"));
+        }
+        let agreements = sqlx::query_as("SELECT id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at FROM agreements WHERE (creator_id=$1 OR participant_id=$1) AND status=$2 ORDER BY created_at DESC")
+            .bind(user).bind(status).fetch_all(&s.db).await.map_err(internal)?;
+        return Ok(Json(agreements));
+    }
+    let agreements = sqlx::query_as("SELECT id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at FROM agreements WHERE creator_id=$1 OR participant_id=$1 ORDER BY created_at DESC")
+        .bind(user).fetch_all(&s.db).await.map_err(internal)?;
+    Ok(Json(agreements))
+}
+async fn agreement(
+    State(s): State<AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> ApiResult<Json<Agreement>> {
+    let user = actor(&headers, &s)?;
+    sqlx::query_as("SELECT id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at FROM agreements WHERE id=$1 AND (creator_id=$2 OR participant_id=$2)")
+        .bind(id).bind(user).fetch_optional(&s.db).await.map_err(internal)?
+        .map(Json).ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "agreement not found".into()))
+}
+async fn accept_agreement(
+    State(s): State<AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> ApiResult<Json<Agreement>> {
+    let participant = actor(&headers, &s)?;
+    let agreement=sqlx::query_as("UPDATE agreements SET accepted_at=now() WHERE id=$1 AND participant_id=$2 AND accepted_at IS NULL AND status='open' RETURNING id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at").bind(id).bind(participant).fetch_optional(&s.db).await.map_err(internal)?.ok_or_else(|| bad("agreement is unavailable, already accepted, or you are not its participant"))?;
+    Ok(Json(agreement))
 }
 async fn complete_agreement(
     State(s): State<AppState>,
@@ -307,7 +381,7 @@ async fn complete_agreement(
     headers: HeaderMap,
 ) -> ApiResult<Json<Agreement>> {
     let user = actor(&headers, &s)?;
-    let agreement=sqlx::query_as("UPDATE agreements SET status='completed',completed_at=now() WHERE id=$1 AND (creator_id=$2 OR participant_id=$2) AND status='open' RETURNING id,creator_id,participant_id,title,description,status").bind(id).bind(user).fetch_optional(&s.db).await.map_err(internal)?.ok_or_else(|| bad("agreement is unavailable, already complete, or you are not a participant"))?;
+    let agreement=sqlx::query_as("UPDATE agreements SET status='completed',completed_at=now() WHERE id=$1 AND (creator_id=$2 OR participant_id=$2) AND status='open' AND accepted_at IS NOT NULL RETURNING id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at").bind(id).bind(user).fetch_optional(&s.db).await.map_err(internal)?.ok_or_else(|| bad("agreement must be accepted and open, and you must be a participant"))?;
     Ok(Json(agreement))
 }
 async fn create_review(
@@ -341,9 +415,21 @@ async fn create_review(
         agreement.0
     };
     let id = Uuid::new_v4();
-    let record=sqlx::query_as("INSERT INTO reviews (id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction").bind(id).bind(input.agreement_id).bind(reviewer).bind(reviewed).bind(input.rating).bind(input.review_text.trim()).fetch_one(&s.db).await.map_err(|_| ApiError(StatusCode::CONFLICT,"you have already reviewed this agreement".into()))?;
+    let record=sqlx::query_as("INSERT INTO reviews (id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at").bind(id).bind(input.agreement_id).bind(reviewer).bind(reviewed).bind(input.rating).bind(input.review_text.trim()).fetch_one(&s.db).await.map_err(|_| ApiError(StatusCode::CONFLICT,"you have already reviewed this agreement".into()))?;
     Ok((StatusCode::CREATED, Json(record)))
 }
+async fn list_reviews(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ReviewQuery>,
+) -> ApiResult<Json<Vec<Review>>> {
+    let user = actor(&headers, &s)?;
+    match query.scope.as_deref().unwrap_or("received") {
+        "received" => sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at FROM reviews WHERE reviewed_user_id=$1 ORDER BY created_at DESC").bind(user).fetch_all(&s.db).await.map(Json).map_err(internal),
+        "given" => sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at FROM reviews WHERE reviewer_id=$1 ORDER BY created_at DESC").bind(user).fetch_all(&s.db).await.map(Json).map_err(internal),
+        _ => Err(bad("scope must be received or given")),
+    }
+}
 async fn verification(State(s): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<Json<Review>> {
-    sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction FROM reviews WHERE id=$1").bind(id).fetch_optional(&s.db).await.map_err(internal)?.map(Json).ok_or_else(|| ApiError(StatusCode::NOT_FOUND,"review not found".into()))
+    sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at FROM reviews WHERE id=$1").bind(id).fetch_optional(&s.db).await.map_err(internal)?.map(Json).ok_or_else(|| ApiError(StatusCode::NOT_FOUND,"review not found".into()))
 }

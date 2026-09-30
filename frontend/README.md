@@ -20,10 +20,14 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## TrustLayer workspace preview
+## TrustLayer workspace
 
-Run the frontend and open `http://localhost:3000/dashboard`, or use the preview
-link on the login and signup pages. No login or running API is needed.
+Run the frontend and open `http://localhost:3000/dashboard` after registering or
+logging in. The workspace loads the signed-in account, agreements, and reviews from
+the local API.
+
+To enable authentication, start `axum-api` on port 3001 and optionally copy
+`.env.example` to `.env.local` if the API uses a different URL.
 
 - `/dashboard`: overview, open work, received feedback, and reviews to write.
 - `/agreements`: searchable list with open/completed filters.
@@ -35,17 +39,13 @@ link on the login and signup pages. No login or running API is needed.
 - `/profile`: public profile preview and reputation history.
 - `/settings`: edit the preview display name, bio, and optional wallet address.
 
-The UI uses in-memory fixtures in `app/components/workspace/model.ts` and a shared
-React provider. Client navigation keeps changes; refreshing or leaving the workspace
-resets them. No API calls, authentication sessions, wallet connections, or blockchain
-transactions are performed. Example verified records are labeled sample data and
-have no explorer links.
+The workspace provider proxies authenticated browser requests through Next.js to the
+API, keeping the backend JWT in an HttpOnly cookie. Wallet ownership and blockchain
+transactions are not yet connected.
 
-The preview follows the existing API's open/completed agreement states. The API
-currently has no agreement acceptance endpoint, agreement listing/detail GET routes,
-or sent-review listing route. Those will need to be addressed when wiring up the
-workspace. New review previews remain pending; entering a wallet address only edits
-the profile field and does not prove wallet ownership.
+The workspace follows the API's open/completed agreement states. New reviews remain
+pending verification; entering a wallet address edits the profile field but does not
+prove wallet ownership.
 
 ## Learn More
 

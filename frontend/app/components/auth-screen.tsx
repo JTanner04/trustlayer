@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./auth-screen.module.css";
 
 type IconName = "layers" | "arrow" | "back" | "shield";
@@ -21,6 +24,50 @@ function Icon({ name }: { name: IconName }) {
 
 export default function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const isSignup = mode === "signup";
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const displayName = String(form.get("name") ?? "").trim();
+    const confirmation = String(form.get("confirm-password") ?? "");
+
+    if (isSignup && password !== confirmation) {
+      setError("Your passwords do not match.");
+      return;
+    }
+    if (isSignup && password.length < 12) {
+      setError("Use a password with at least 12 characters.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/auth/${isSignup ? "register" : "login"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isSignup ? { email, password, display_name: displayName } : { email, password },
+        ),
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setError(result.error ?? "We could not complete that request. Please try again.");
+        return;
+      }
+      router.replace("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Could not reach TrustLayer. Check that both the frontend and API are running.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -49,37 +96,33 @@ export default function AuthScreen({ mode }: { mode: "login" | "signup" }) {
               </p>
             </div>
 
-            {/* Account submission remains disabled until authentication is connected. */}
-            <div className={styles.fields} role="group" aria-label={isSignup ? "Sign up details" : "Login details"}>
+            <form className={styles.fields} onSubmit={submit} aria-label={isSignup ? "Sign up details" : "Login details"}>
               {isSignup && (
                 <div className={styles.field}>
                   <label htmlFor="name">Full name</label>
-                  <input id="name" name="name" type="text" autoComplete="name" placeholder="Your full name" />
+                  <input id="name" name="name" type="text" autoComplete="name" placeholder="Your full name" required />
                 </div>
               )}
               <div className={styles.field}>
                 <label htmlFor="email">Email address</label>
-                <input id="email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" />
+                <input id="email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" required />
               </div>
               <div className={styles.field}>
                 <label htmlFor="password">Password</label>
-                <input id="password" name="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} placeholder={isSignup ? "Create a password" : "Enter your password"} />
+                <input id="password" name="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} placeholder={isSignup ? "Create a password (12+ characters)" : "Enter your password"} minLength={isSignup ? 12 : undefined} required />
               </div>
               {isSignup && (
                 <div className={styles.field}>
                   <label htmlFor="confirm-password">Confirm password</label>
-                  <input id="confirm-password" name="confirm-password" type="password" autoComplete="new-password" placeholder="Re-enter your password" />
+                  <input id="confirm-password" name="confirm-password" type="password" autoComplete="new-password" placeholder="Re-enter your password" required />
                 </div>
               )}
-              <button type="button" className={styles.submitButton} disabled aria-describedby="preview-note">
-                {isSignup ? "Create account" : "Log in"}<Icon name="arrow" />
+              {error && <p className={styles.formError} role="alert">{error}</p>}
+              <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+                {isSubmitting ? "Please wait…" : isSignup ? "Create account" : "Log in"}<Icon name="arrow" />
               </button>
-            </div>
+            </form>
 
-            <div className={styles.previewNote} id="preview-note">
-              <span className={styles.previewDot} />
-              <p><strong>Frontend preview</strong>Account {isSignup ? "creation" : "login"} isn’t connected yet. <Link href="/dashboard" className="font-semibold underline underline-offset-4">Explore the dashboard preview</Link></p>
-            </div>
             <p className={styles.switchAccount}>
               {isSignup ? "Already have an account? " : "New to TrustLayer? "}
               <Link href={isSignup ? "/login" : "/signup"}>{isSignup ? "Log in" : "Create an account"}<Icon name="arrow" /></Link>
