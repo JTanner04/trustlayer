@@ -1,0 +1,22 @@
+# Local environment and secrets
+.env
+.env.local
+.env.*.local
+
+# JavaScript / Next.js artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+
+# Rust artifacts
+axum-api/target/
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
