@@ -9,6 +9,13 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::{
+    commitment_config::CommitmentConfig,
+    signature::{Signer, read_keypair_file},
+    transaction::Transaction,
+};
 use sqlx::{FromRow, PgPool, postgres::PgPoolOptions};
 use std::{env, net::SocketAddr};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -18,6 +25,12 @@ use uuid::Uuid;
 struct AppState {
     db: PgPool,
     jwt_secret: String,
+    solana: Option<SolanaConfig>,
+}
+#[derive(Clone)]
+struct SolanaConfig {
+    rpc_url: String,
+    keypair_path: String,
 }
 #[derive(Serialize)]
 struct Health {
@@ -180,7 +193,23 @@ async fn main() {
         .run(&db)
         .await
         .expect("could not run migrations");
-    let state = AppState { db, jwt_secret };
+    let solana = env::var("SOLANA_KEYPAIR_PATH")
+        .ok()
+        .map(|keypair_path| SolanaConfig {
+            rpc_url: env::var("SOLANA_RPC_URL")
+                .unwrap_or_else(|_| "https://api.devnet.solana.com".into()),
+            keypair_path,
+        });
+    if solana.is_none() {
+        tracing::warn!(
+            "Solana verification is disabled: set SOLANA_KEYPAIR_PATH to enable Devnet records"
+        );
+    }
+    let state = AppState {
+        db,
+        jwt_secret,
+        solana,
+    };
     let app = Router::new()
         .route("/health", get(health))
         .route("/auth/register", post(register))
@@ -416,7 +445,65 @@ async fn create_review(
     };
     let id = Uuid::new_v4();
     let record=sqlx::query_as("INSERT INTO reviews (id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at").bind(id).bind(input.agreement_id).bind(reviewer).bind(reviewed).bind(input.rating).bind(input.review_text.trim()).fetch_one(&s.db).await.map_err(|_| ApiError(StatusCode::CONFLICT,"you have already reviewed this agreement".into()))?;
+    let verification = match &s.solana {
+        Some(config) => {
+            submit_verification(
+                config.clone(),
+                id,
+                input.agreement_id,
+                reviewer,
+                reviewed,
+                input.rating,
+            )
+            .await
+        }
+        None => Err("Solana verification is not configured on this server".into()),
+    };
+    let (status, transaction) = match verification {
+        Ok(signature) => ("verified", Some(signature)),
+        Err(error) => {
+            tracing::warn!(review_id = %id, %error, "review verification failed");
+            ("failed", None)
+        }
+    };
+    sqlx::query("UPDATE reviews SET verification_status=$1, blockchain_transaction=$2 WHERE id=$3")
+        .bind(status)
+        .bind(&transaction)
+        .bind(id)
+        .execute(&s.db)
+        .await
+        .map_err(internal)?;
+    let record = Review {
+        verification_status: status.into(),
+        blockchain_transaction: transaction,
+        ..record
+    };
     Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn submit_verification(
+    config: SolanaConfig,
+    review_id: Uuid,
+    agreement_id: Uuid,
+    reviewer_id: Uuid,
+    reviewed_user_id: Uuid,
+    rating: i16,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        let payload = format!("trustlayer:v1|review:{review_id}|agreement:{agreement_id}|reviewer:{reviewer_id}|reviewed:{reviewed_user_id}|rating:{rating}");
+        let digest = hex::encode(Sha256::digest(payload.as_bytes()));
+        let memo = format!("trustlayer:v1:{digest}");
+        let payer = read_keypair_file(&config.keypair_path).map_err(|error| format!("could not read Solana signer: {error}"))?;
+        let client = RpcClient::new_with_commitment(config.rpc_url, CommitmentConfig::confirmed());
+        let instruction = spl_memo::build_memo(memo.as_bytes(), &[&payer.pubkey()]);
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&payer.pubkey()),
+            &[&payer],
+            client.get_latest_blockhash().map_err(|error| format!("could not get Solana blockhash: {error}"))?,
+        );
+        client.send_and_confirm_transaction(&transaction).map(|signature| signature.to_string()).map_err(|error| format!("Solana transaction failed: {error}"))
+    }).await.map_err(|error| format!("verification task failed: {error}"))?
 }
 async fn list_reviews(
     State(s): State<AppState>,

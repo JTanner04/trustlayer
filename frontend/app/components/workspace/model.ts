@@ -5,6 +5,7 @@ export type Agreement = {
   title: string;
   description: string;
   status: "open" | "completed";
+  accepted_at: string | null;
   date: string;
 };
 

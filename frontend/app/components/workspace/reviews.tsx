@@ -284,11 +284,11 @@ export function Verification() {
   const a = agreements.find((a) => a.id === r.agreement_id);
   const descriptions = {
     verified:
-      "This sample shows a review with a recorded verification. It is a visual example, not a live blockchain result.",
+      "A confirmed Solana Devnet transaction records a digest that links this review to its completed agreement.",
     pending:
-      "The review is saved in this preview. Its verification record has not been written to Solana.",
+      "The review is saved, but its verification transaction has not been confirmed yet.",
     failed:
-      "This sample shows a review whose verification could not be completed. The review remains visible, but is not verified.",
+      "The review remains visible, but its Solana verification transaction could not be completed.",
   };
   return (
     <>
@@ -347,7 +347,7 @@ export function Verification() {
                   <strong>Solana verification record</strong>
                   <p>
                     {r.verification_status === "verified"
-                      ? "Verified state shown with sample data."
+                      ? "Confirmed Devnet transaction recorded."
                       : "No confirmed transaction available."}
                   </p>
                 </div>
@@ -386,14 +386,20 @@ export function Verification() {
             </div>
             <div>
               <dt>Verification network</dt>
-              <dd>Solana · preview only</dd>
+              <dd>Solana Devnet</dd>
             </div>
             <div>
               <dt>Transaction</dt>
               <dd>
-                {r.blockchain_transaction
-                  ? "Illustrative transaction only. No explorer link is available for sample data."
-                  : "Not recorded"}
+                {r.blockchain_transaction ? (
+                  <a
+                    href={`https://explorer.solana.com/tx/${r.blockchain_transaction}?cluster=devnet`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View transaction in Solana Explorer
+                  </a>
+                ) : "Not recorded"}
               </dd>
             </div>
           </dl>

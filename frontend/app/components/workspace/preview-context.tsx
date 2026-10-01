@@ -7,6 +7,7 @@ type State = { currentUserId: string; agreements: Agreement[]; reviews: Review[]
 type WorkspaceContext = State & {
   reload: () => Promise<void>;
   createAgreement: (input: Pick<Agreement, "title" | "description" | "participant_id">) => Promise<string>;
+  acceptAgreement: (id: string) => Promise<void>;
   completeAgreement: (id: string) => Promise<void>;
   addReview: (agreementId: string, rating: number, text: string) => Promise<void>;
   saveProfile: (profile: Profile) => Promise<void>;
@@ -14,7 +15,7 @@ type WorkspaceContext = State & {
 const Context = createContext<WorkspaceContext | null>(null);
 const emptyProfile: Profile = { display_name: "", bio: "", wallet_address: "" };
 const alias = (id: unknown, userId: string) => id === userId ? CURRENT_USER : String(id);
-const toAgreement = (value: Record<string, unknown>, userId: string): Agreement => ({ ...value, creator_id: alias(value.creator_id, userId), participant_id: alias(value.participant_id, userId), status: value.status as Agreement["status"], date: String(value.created_at) }) as Agreement;
+const toAgreement = (value: Record<string, unknown>, userId: string): Agreement => ({ ...value, creator_id: alias(value.creator_id, userId), participant_id: alias(value.participant_id, userId), status: value.status as Agreement["status"], accepted_at: value.accepted_at ? String(value.accepted_at) : null, date: String(value.created_at) }) as Agreement;
 const toReview = (value: Record<string, unknown>, userId: string): Review => ({ ...value, reviewer_id: alias(value.reviewer_id, userId), reviewed_user_id: alias(value.reviewed_user_id, userId), rating: Number(value.rating), verification_status: value.verification_status as Review["verification_status"], blockchain_transaction: value.blockchain_transaction as string | null, date: String(value.created_at) }) as Review;
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -46,6 +47,10 @@ export function PreviewProvider({ children }: { children: ReactNode }) {
     const agreement = await api<Record<string, unknown>>("agreements", { method: "POST", body: JSON.stringify(input) });
     const mapped = toAgreement(agreement, state.currentUserId); setState((s) => ({ ...s, agreements: [mapped, ...s.agreements] })); return mapped.id;
   }
+  async function acceptAgreement(id: string) {
+    const agreement = await api<Record<string, unknown>>(`agreements/${id}/accept`, { method: "POST" });
+    const mapped = toAgreement(agreement, state.currentUserId); setState((s) => ({ ...s, agreements: s.agreements.map((item) => item.id === id ? mapped : item) }));
+  }
   async function completeAgreement(id: string) {
     const agreement = await api<Record<string, unknown>>(`agreements/${id}/complete`, { method: "POST" });
     const mapped = toAgreement(agreement, state.currentUserId); setState((s) => ({ ...s, agreements: s.agreements.map((item) => item.id === id ? mapped : item) }));
@@ -58,6 +63,6 @@ export function PreviewProvider({ children }: { children: ReactNode }) {
     const saved = await api<Profile>(`profiles/${state.currentUserId}`, { method: "PUT", body: JSON.stringify({ ...profile, wallet_address: profile.wallet_address || null }) });
     setState((s) => ({ ...s, profile: { ...saved, wallet_address: saved.wallet_address ?? "" } }));
   }
-  return <Context.Provider value={{ ...state, reload, createAgreement, completeAgreement, addReview, saveProfile }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ ...state, reload, createAgreement, acceptAgreement, completeAgreement, addReview, saveProfile }}>{children}</Context.Provider>;
 }
 export function usePreview() { const value = useContext(Context); if (!value) throw new Error("Workspace provider is required"); return value; }

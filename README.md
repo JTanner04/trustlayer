@@ -1,33 +1,86 @@
 # TrustLayer
 
-TrustLayer is a blockchain-backed reputation platform that allows users
-to build portable, verifiable reputations based on completed interactions
-and peer reviews.
+TrustLayer is a reputation platform where completed agreements and peer reviews
+build a portable, verifiable work history. The MVP records a privacy-preserving
+verification digest for each review on Solana Devnet.
 
-Instead of relying entirely on a centralized platform to control reputation
-data, TrustLayer records verification information on the Solana blockchain.
-Users can independently verify that reputation records are authentic and
-have not been altered.
-
-## Proposed Technology Stack
+## Technology stack
 
 - Frontend: React / Next.js
 - Backend: Rust + Axum
 - Database: PostgreSQL
-- Blockchain: Solana
-- Smart Contracts: Rust + Anchor
-- Containerization: Docker
+- Verification records: Solana Memo program on Devnet
 
-## Team Members
+## Team
 
 - Jeremiah Tanner
 - Jailin West
 
-## Project Status
+## Run locally
 
-Project Milestone 1 - MVP implementation in progress
+### Prerequisites
 
-## Local development
+- Node.js 20 or later and npm
+- Rust stable toolchain
+- PostgreSQL 15 or later
+- Optional: Solana CLI and a funded Devnet keypair for live verification records
+
+### 1. Create the local database
+
+Start PostgreSQL, then create an empty database. The default command uses your
+local PostgreSQL user; if yours needs credentials, use its connection string in
+the next step instead.
+
+```sh
+createdb trustlayer
+```
+
+### 2. Start the API
+
+From `axum-api`, set local-only environment variables and run the server.
+Migrations apply automatically on startup.
+
+```sh
+cd axum-api
+export DATABASE_URL='postgres://<postgres-user>:<postgres-password>@localhost:5432/trustlayer'
+export JWT_SECRET="$(openssl rand -hex 32)"
+cargo run
+```
+
+The API listens at `http://127.0.0.1:3001`. Confirm it is healthy at
+`http://127.0.0.1:3001/health`.
+
+### 3. Start the frontend
+
+Open another terminal:
+
+```sh
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`, create an account, and log in. The frontend uses
+`http://127.0.0.1:3001` by default. If your API uses another address, copy
+`frontend/.env.example` to the ignored `frontend/.env.local` and set
+`TRUSTLAYER_API_URL` there before starting Next.js.
+
+### Optional: enable Devnet verification
+
+Live verification is deliberately opt-in. Keep a funded **Devnet-only** keypair
+outside the repository, then set its local path before starting the API:
+
+```sh
+export SOLANA_RPC_URL='https://api.devnet.solana.com'
+export SOLANA_KEYPAIR_PATH='/absolute/path/outside/the/repository/devnet-keypair.json'
+```
+
+Never commit keypair JSON, a seed phrase, `.env` files, or a real JWT secret.
+Without these Solana variables, all account, profile, agreement, and review
+features work; review verification will be marked `failed` because no on-chain
+signer is configured.
+
+## Project layout
 
 ```text
 trustlayer/
@@ -38,23 +91,5 @@ trustlayer/
 └── README.md
 ```
 
-Start the two applications in separate terminals:
-
-```sh
-# Terminal 1 — frontend
-cd frontend
-npm install
-npm run dev
-```
-
-```sh
-# Terminal 2 — backend (PostgreSQL must be running)
-cd axum-api
-export DATABASE_URL='postgres://trustlayer:trustlayer@localhost:5432/trustlayer'
-export JWT_SECRET='replace-with-a-long-random-secret'
-cargo run
-```
-
-The frontend runs at http://localhost:3000 and the API at http://localhost:3001.
 See the [frontend README](frontend/README.md) and [API README](axum-api/README.md)
-for component-specific setup.
+for component-specific details.

@@ -206,8 +206,10 @@ export function NewAgreement() {
 
 export function AgreementDetail() {
   const { id } = useParams<{ id: string }>();
-  const { agreements, reviews, completeAgreement } = usePreview();
+  const { agreements, reviews, acceptAgreement, completeAgreement } = usePreview();
   const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const a = agreements.find((a) => a.id === id);
   if (!a)
     return (
@@ -223,6 +225,20 @@ export function AgreementDetail() {
   );
   const agreementReviews = reviews.filter((r) => r.agreement_id === id);
   const other = counterpart(a);
+  const awaitingMyAcceptance = a.status === "open" && !a.accepted_at && a.participant_id === CURRENT_USER;
+  const awaitingOtherAcceptance = a.status === "open" && !a.accepted_at && a.creator_id === CURRENT_USER;
+  async function accept() {
+    setSaving(true); setError("");
+    try { await acceptAgreement(id); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not accept this agreement."); }
+    finally { setSaving(false); }
+  }
+  async function complete() {
+    setSaving(true); setError("");
+    try { await completeAgreement(id); setConfirm(false); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not complete this agreement."); }
+    finally { setSaving(false); }
+  }
   return (
     <>
       <Link className={s.back} href="/agreements">
@@ -267,20 +283,35 @@ export function AgreementDetail() {
           </section>
           <section className={`${s.panel} ${s.padded}`}>
             <h2>
-              {a.status === "open"
+              {awaitingMyAcceptance
+                ? "Review and accept this agreement"
+                : awaitingOtherAcceptance
+                  ? "Waiting for acceptance"
+                : a.status === "open"
                 ? "Ready to call it complete?"
                 : myReview
                   ? "Your review is on the record."
                   : "The work is complete. Share your experience."}
             </h2>
             <p className={s.longText}>
-              {a.status === "open"
+              {awaitingMyAcceptance
+                ? "You were invited to this agreement. Accept it before either participant can mark the work complete."
+                : awaitingOtherAcceptance
+                  ? "The invited participant must accept this agreement before either of you can mark the work complete."
+                : a.status === "open"
                 ? "Mark this agreement complete once the work is done. This makes it eligible for a review from each participant."
                 : myReview
                   ? "You’ve already reviewed this agreement. Each participant can submit one review."
                   : `Leave a review for ${other.name}. Your feedback will be linked to this completed agreement.`}
             </p>
-            {a.status === "open" ? (
+            {awaitingMyAcceptance ? (
+              <button className={s.primary} onClick={() => void accept()} disabled={saving}>
+                <Icon name="check" />
+                {saving ? "Accepting…" : "Accept agreement"}
+              </button>
+            ) : awaitingOtherAcceptance ? (
+              <p className={s.footnote}>Share this agreement with the invited participant so they can sign in and accept it.</p>
+            ) : a.status === "open" ? (
               confirm ? (
                 <div className={s.confirmation}>
                   <strong>Mark this agreement complete?</strong>
@@ -288,12 +319,10 @@ export function AgreementDetail() {
                   <div className={s.inlineActions}>
                     <button
                       className={s.primary}
-                      onClick={() => {
-                        completeAgreement(id);
-                        setConfirm(false);
-                      }}
+                      onClick={() => void complete()}
+                      disabled={saving}
                     >
-                      Confirm completion
+                      {saving ? "Completing…" : "Confirm completion"}
                     </button>
                     <button
                       className={s.secondary}
@@ -322,6 +351,7 @@ export function AgreementDetail() {
                 <Icon name="arrow" />
               </Link>
             )}
+            {error && <p role="alert" className={s.error}>{error}</p>}
           </section>
           {agreementReviews.length > 0 && (
             <section>

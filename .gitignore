@@ -3,6 +3,15 @@
 .env.local
 .env.*.local
 
+# Private signing material (keep wallet files outside this repository)
+*.key
+*.pem
+*.p8
+*-keypair.json
+*-devnet.json
+keypairs/
+wallets/
+
 # JavaScript / Next.js artifacts
 frontend/node_modules/
 frontend/.next/
