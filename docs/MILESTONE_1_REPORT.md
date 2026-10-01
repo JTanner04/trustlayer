@@ -174,12 +174,3 @@ Demo video link: **https://youtu.be/cz4yWrr2Zdo**
 
 - **Jeremiah Tanner:** Developed the Rust/Axum backend, PostgreSQL database and migrations, authentication system, agreement and review APIs, and Solana Devnet verification integration. Also connected the backend to the frontend and prepared the project’s setup, security, and TA verification documentation.
 - **Jailin West:** Worked with react and next.js to build out a front end shell with a homepage for a general information on the sight, a login & signup page, a dashboard page, as-well as profile page etc. These pages work as the user facing side where users can setup account connect their wallets and be able to view and manage their agreements properly. This is later connected to the backend with is the work engine behind the UI/UX that gives the site an overall inviting feel.
-
-## Submission checklist
-
-- [ ] Replace the demo video placeholder.
-- [ ] Replace both contribution placeholders.
-- [ ] Export this document as a PDF, preserving the GitHub repository link.
-- [ ] Commit all final code and documentation.
-- [ ] Create and push the annotated Git tag `milestone-1` on the final commit.
-- [ ] Upload the final PDF to Gradescope.
