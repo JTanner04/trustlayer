@@ -360,8 +360,24 @@ async fn create_agreement(
     Json(input): Json<CreateAgreement>,
 ) -> ApiResult<(StatusCode, Json<Agreement>)> {
     let creator_id = actor(&headers, &s)?;
-    if creator_id == input.participant_id || input.title.trim().is_empty() {
-        return Err(bad("an agreement needs another participant and a title"));
+    if input.title.trim().is_empty() {
+        return Err(bad("an agreement title is required"));
+    }
+    if creator_id == input.participant_id {
+        return Err(bad(
+            "choose another user's ID; you cannot create an agreement with yourself",
+        ));
+    }
+    let participant_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id=$1)")
+            .bind(input.participant_id)
+            .fetch_one(&s.db)
+            .await
+            .map_err(internal)?;
+    if !participant_exists {
+        return Err(bad(
+            "no TrustLayer account exists for that participant user ID",
+        ));
     }
     let id = Uuid::new_v4();
     let agreement=sqlx::query_as("INSERT INTO agreements (id,creator_id,participant_id,title,description) VALUES ($1,$2,$3,$4,$5) RETURNING id,creator_id,participant_id,title,description,status,accepted_at,completed_at,created_at").bind(id).bind(creator_id).bind(input.participant_id).bind(input.title.trim()).bind(input.description.trim()).fetch_one(&s.db).await.map_err(internal)?;

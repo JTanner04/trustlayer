@@ -99,7 +99,7 @@ export function Agreements() {
 }
 
 export function NewAgreement() {
-  const { createAgreement } = usePreview();
+  const { createAgreement, currentUserId } = usePreview();
   const router = useRouter();
   const [error, setError] = useState("");
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -112,7 +112,7 @@ export function NewAgreement() {
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         participant_id,
       ) ||
-      participant_id === CURRENT_USER
+      participant_id === currentUserId
     )
       return setError("Enter another participant’s valid user ID.");
     try {
