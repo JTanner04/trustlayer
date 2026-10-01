@@ -168,7 +168,7 @@ Record a short demonstration of the same flow in the TA verification steps:
 4. Show the updated reputation profile API response and review verification state.
 5. If Devnet is enabled, open the transaction in Solana Explorer.
 
-Demo video link: **[Team: add video link here]**
+Demo video link: **https://youtu.be/cz4yWrr2Zdo**
 
 ## 7. Team contributions
 
