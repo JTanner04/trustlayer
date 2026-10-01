@@ -92,4 +92,5 @@ trustlayer/
 ```
 
 See the [frontend README](frontend/README.md) and [API README](axum-api/README.md)
-for component-specific details.
+for component-specific details. The [Milestone 1 report source](docs/MILESTONE_1_REPORT.md)
+contains requirements, architecture, TA verification steps, and the submission checklist.
