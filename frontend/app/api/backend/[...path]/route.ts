@@ -8,7 +8,7 @@ function allowed(path: string[], method: string) {
     (method === "GET" && (value === "me" || value === "agreements" || value === "reviews")) ||
     (method === "POST" && (value === "agreements" || value === "reviews")) ||
     (method === "GET" && /^agreements\/[^/]+$/.test(value)) ||
-    (method === "PUT" && /^profiles\/[^/]+$/.test(value)) ||
+    ((method === "GET" || method === "PUT") && /^profiles\/[^/]+$/.test(value)) ||
     (method === "POST" && /^agreements\/[^/]+\/(accept|complete)$/.test(value)) ||
     (method === "GET" && /^reviews\/[^/]+\/verification$/.test(value))
   );

@@ -31,13 +31,20 @@ export type Profile = {
 };
 
 export type Person = { id: string; name: string; initials: string; role: string };
-export const people: Person[] = [];
+
+// Display names for other users, filled in by the workspace provider from their public profiles.
+const displayNames = new Map<string, string>();
+
+export function rememberDisplayNames(names: Record<string, string>) {
+  for (const [id, name] of Object.entries(names)) displayNames.set(id, name);
+}
 
 export function person(id: string): Person {
+  const name = displayNames.get(id) ?? `User ${id.slice(0, 8)}`;
   return {
     id,
-    name: `User ${id.slice(0, 8)}`,
-    initials: id.slice(0, 2).toUpperCase(),
+    name,
+    initials: name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
     role: "TrustLayer member",
   };
 }

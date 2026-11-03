@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { CURRENT_USER, type Agreement, type Profile, type Review } from "./model";
+import { CURRENT_USER, rememberDisplayNames, type Agreement, type Profile, type Review } from "./model";
 
 type State = { currentUserId: string; agreements: Agreement[]; reviews: Review[]; profile: Profile; loading: boolean; error: string | null };
 type WorkspaceContext = State & {
@@ -28,6 +28,14 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+// Looks up other users' display names from their public profiles; a failed lookup keeps the short-ID fallback.
+async function loadDisplayNames(ids: string[]) {
+  const entries = await Promise.all([...new Set(ids)].map(async (id) => {
+    try { return [id, (await api<{ display_name: string }>(`profiles/${id}`)).display_name] as const; } catch { return null; }
+  }));
+  rememberDisplayNames(Object.fromEntries(entries.filter((entry) => entry !== null)));
+}
+
 export function PreviewProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<State>({ currentUserId: "", agreements: [], reviews: [], profile: emptyProfile, loading: true, error: null });
@@ -41,6 +49,8 @@ export function PreviewProvider({ children }: { children: ReactNode }) {
         api<Record<string, unknown>[]>("reviews?scope=given"),
       ]);
       const reviews = [...received, ...given].map((review) => toReview(review, me.user.id)).filter((review, index, all) => all.findIndex((other) => other.id === review.id) === index);
+      const otherIds = [...agreements.flatMap((a) => [a.creator_id, a.participant_id]), ...received.map((r) => r.reviewer_id), ...given.map((r) => r.reviewed_user_id)].map(String).filter((id) => id !== me.user.id);
+      await loadDisplayNames(otherIds);
       setState({ currentUserId: me.user.id, profile: { ...me.profile, wallet_address: me.profile.wallet_address ?? "" }, agreements: agreements.map((agreement) => toAgreement(agreement, me.user.id)), reviews, loading: false, error: null });
     } catch (error) {
       // Expired or invalid session: send the user back to log in.
@@ -51,6 +61,7 @@ export function PreviewProvider({ children }: { children: ReactNode }) {
   useEffect(() => { void reload(); }, [reload]);
   async function createAgreement(input: Pick<Agreement, "title" | "description" | "participant_id">) {
     const agreement = await api<Record<string, unknown>>("agreements", { method: "POST", body: JSON.stringify(input) });
+    await loadDisplayNames([String(agreement.participant_id)]);
     const mapped = toAgreement(agreement, state.currentUserId); setState((s) => ({ ...s, agreements: [mapped, ...s.agreements] })); return mapped.id;
   }
   async function acceptAgreement(id: string) {

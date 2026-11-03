@@ -7,12 +7,13 @@ import { Avatar, Empty, Heading, Icon, ReviewCard } from "./ui";
 import s from "./workspace.module.css";
 
 export function PublicProfile() {
-  const { profile, reviews, agreements } = usePreview();
+  const { profile, reviews, agreements, currentUserId } = usePreview();
   const received = reviews.filter((r) => r.reviewed_user_id === CURRENT_USER);
   const [message, setMessage] = useState("");
   async function copy() {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      // Share the public page, not this signed-in workspace view.
+      await navigator.clipboard.writeText(`${window.location.origin}/profiles/${currentUserId}`);
       setMessage(
         "Profile link copied.",
       );
@@ -158,7 +159,7 @@ export function ProfileSettings() {
         title="Profile settings"
         description="Give people a little context about the person behind the work."
         action={
-          <Link className={s.secondary} href="/profile">
+          <Link className={s.secondary} href={currentUserId ? `/profiles/${currentUserId}` : "/profile"}>
             View public profile
             <Icon name="external" />
           </Link>

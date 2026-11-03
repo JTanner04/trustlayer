@@ -9,7 +9,7 @@ const links: { href: string; label: string; icon: IconName }[] = [
   { href: "/dashboard", label: "Overview", icon: "grid" },
   { href: "/agreements", label: "Agreements", icon: "file" },
   { href: "/reviews", label: "Reviews", icon: "star" },
-  { href: "/profile", label: "My public profile", icon: "person" },
+  { href: "/profile", label: "My profile", icon: "person" },
   { href: "/settings", label: "Profile settings", icon: "settings" },
 ];
 function Workspace({ children }: { children: ReactNode }) {
