@@ -23,6 +23,10 @@ environment variables rather than loading a secrets file; never commit a local
 The API applies its migrations automatically and listens on `127.0.0.1:3001` by
 default. Use `GET /health` to confirm it is running.
 
+To load demonstration accounts and sample agreements/reviews (requires Node.js
+for JSON parsing), run `bash scripts/seed-demo-data.sh` while the API is
+running. See the repository [README](../README.md) for the demo credentials.
+
 ## API flow
 
 1. `POST /auth/register` with `email`, `password` (12+ characters), and `display_name`.

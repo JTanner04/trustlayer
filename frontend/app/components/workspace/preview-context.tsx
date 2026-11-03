@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { CURRENT_USER, type Agreement, type Profile, type Review } from "./model";
 
 type State = { currentUserId: string; agreements: Agreement[]; reviews: Review[]; profile: Profile; loading: boolean; error: string | null };
@@ -18,16 +19,19 @@ const alias = (id: unknown, userId: string) => id === userId ? CURRENT_USER : St
 const toAgreement = (value: Record<string, unknown>, userId: string): Agreement => ({ ...value, creator_id: alias(value.creator_id, userId), participant_id: alias(value.participant_id, userId), status: value.status as Agreement["status"], accepted_at: value.accepted_at ? String(value.accepted_at) : null, date: String(value.created_at) }) as Agreement;
 const toReview = (value: Record<string, unknown>, userId: string): Review => ({ ...value, reviewer_id: alias(value.reviewer_id, userId), reviewed_user_id: alias(value.reviewed_user_id, userId), rating: Number(value.rating), verification_status: value.verification_status as Review["verification_status"], blockchain_transaction: value.blockchain_transaction as string | null, date: String(value.created_at) }) as Review;
 
+class ApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/backend/${path}`, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error ?? "Request failed.");
+  if (!response.ok) throw new ApiError(data.error ?? "Request failed.", response.status);
   return data as T;
 }
 
 export function PreviewProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [state, setState] = useState<State>({ currentUserId: "", agreements: [], reviews: [], profile: emptyProfile, loading: true, error: null });
-  async function reload() {
+  const reload = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const [me, agreements, received, given] = await Promise.all([
@@ -39,10 +43,12 @@ export function PreviewProvider({ children }: { children: ReactNode }) {
       const reviews = [...received, ...given].map((review) => toReview(review, me.user.id)).filter((review, index, all) => all.findIndex((other) => other.id === review.id) === index);
       setState({ currentUserId: me.user.id, profile: { ...me.profile, wallet_address: me.profile.wallet_address ?? "" }, agreements: agreements.map((agreement) => toAgreement(agreement, me.user.id)), reviews, loading: false, error: null });
     } catch (error) {
+      // Expired or invalid session: send the user back to log in.
+      if (error instanceof ApiError && error.status === 401) { router.replace("/login"); return; }
       setState((s) => ({ ...s, loading: false, error: error instanceof Error ? error.message : "Could not load your workspace." }));
     }
-  }
-  useEffect(() => { void reload(); }, []);
+  }, [router]);
+  useEffect(() => { void reload(); }, [reload]);
   async function createAgreement(input: Pick<Agreement, "title" | "description" | "participant_id">) {
     const agreement = await api<Record<string, unknown>>("agreements", { method: "POST", body: JSON.stringify(input) });
     const mapped = toAgreement(agreement, state.currentUserId); setState((s) => ({ ...s, agreements: [mapped, ...s.agreements] })); return mapped.id;

@@ -170,7 +170,7 @@ export default function Home() {
 
       <footer className={`${styles.container} ${styles.footer}`}>
         <span><strong>TrustLayer.</strong> Real work. Verifiable reputation.</span>
-        <p><span className={styles.statusDot} />Frontend preview · Agreements, reviews, and verification are in development.</p>
+        <p>© 2026 TrustLayer. All rights reserved.</p>
       </footer>
     </div>
   );

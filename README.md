@@ -50,6 +50,24 @@ cargo run
 The API listens at `http://127.0.0.1:3001`. Confirm it is healthy at
 `http://127.0.0.1:3001/health`.
 
+### Optional: seed demonstration data
+
+With the API running, open another terminal and load two demo accounts with
+sample agreements (completed, in progress, and a pending invitation) and reviews:
+
+```sh
+cd axum-api
+bash scripts/seed-demo-data.sh
+```
+
+| Account | Email | Password |
+| --- | --- | --- |
+| Alice Rivera | `alice@demo.trustlayer.test` | `trustlayer-demo-2026` |
+| Bob Chen | `bob@demo.trustlayer.test` | `trustlayer-demo-2026` |
+
+These are local demonstration credentials only. Re-running the script is safe;
+it exits if the demo accounts already exist.
+
 ### 3. Start the frontend
 
 Open another terminal:

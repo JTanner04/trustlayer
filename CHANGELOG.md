@@ -2,12 +2,14 @@
 
 All notable TrustLayer changes are documented here.
 
-## [Unreleased] - Milestone 2
+## [milestone-2] - November 2026
 
 ### Added
 
 - Shareable public reputation pages at `/profiles/{userId}`.
 - Sign out endpoint and workspace control for switching accounts safely.
+- Workspace pages redirect to login when the session is missing or expired.
+- Demo-account seed script (`axum-api/scripts/seed-demo-data.sh`).
 - Backend unit suite, API workflow integration script, and coverage report.
 - Milestone 2 QA, threat-model, OWASP, and peer-review documentation.
 
