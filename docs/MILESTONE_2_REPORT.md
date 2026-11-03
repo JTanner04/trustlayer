@@ -185,5 +185,9 @@ section 4.5.
 
 ## 8. Team contributions
 
-- **Jeremiah Tanner:** **[add 1–2 sentences]**
+- **Jeremiah Tanner:** Implemented the Axum backend and the Milestone 2 API
+  hardening work, including validation, JWT and CORS safeguards, response
+  headers, automated backend tests, coverage tooling, and the API integration
+  flow. Also reviewed Jailin's Milestone 2 changes and documented the resulting
+  findings in Review B.
 - **Jailin West:** **[add 1–2 sentences]**
