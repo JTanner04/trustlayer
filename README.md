@@ -94,3 +94,8 @@ trustlayer/
 See the [frontend README](frontend/README.md) and [API README](axum-api/README.md)
 for component-specific details. The [Milestone 1 report source](docs/MILESTONE_1_REPORT.md)
 contains requirements, architecture, TA verification steps, and the submission checklist.
+The [Milestone 2 test and security report](docs/MILESTONE_2_TEST_AND_SECURITY.md)
+documents the test plan, threat model, OWASP assessment, and hardening work.
+See the [changelog](CHANGELOG.md) for release history and the
+[development workflow](docs/DEVELOPMENT_WORKFLOW.md) for branch, commit, and
+review conventions.

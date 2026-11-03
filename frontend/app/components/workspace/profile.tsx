@@ -261,6 +261,12 @@ export function ProfileSettings() {
             Other people will use your user ID when creating an agreement with
             you.
           </p>
+          {currentUserId && (
+            <Link href={`/profiles/${currentUserId}`} className={s.secondary}>
+              View public profile
+              <Icon name="arrow" />
+            </Link>
+          )}
         </aside>
       </div>
     </>

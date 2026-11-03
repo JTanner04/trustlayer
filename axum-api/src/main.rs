@@ -1,7 +1,14 @@
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode, header::AUTHORIZATION},
+    extract::{DefaultBodyLimit, Path, Query, State},
+    http::{
+        HeaderMap, HeaderValue, Method, StatusCode,
+        header::{
+            AUTHORIZATION, CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, REFERRER_POLICY,
+            X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
+        },
+    },
+    middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -141,6 +148,108 @@ type ApiResult<T> = Result<T, ApiError>;
 fn bad(message: impl Into<String>) -> ApiError {
     ApiError(StatusCode::BAD_REQUEST, message.into())
 }
+
+const MAX_EMAIL_LENGTH: usize = 254;
+const MAX_DISPLAY_NAME_LENGTH: usize = 80;
+const MAX_BIO_LENGTH: usize = 2_000;
+const MAX_WALLET_ADDRESS_LENGTH: usize = 64;
+const MAX_AGREEMENT_TITLE_LENGTH: usize = 160;
+const MAX_AGREEMENT_DESCRIPTION_LENGTH: usize = 5_000;
+const MAX_REVIEW_LENGTH: usize = 2_000;
+
+fn is_valid_email(email: &str) -> bool {
+    let email = email.trim();
+    email.len() <= MAX_EMAIL_LENGTH
+        && email.contains('@')
+        && email.split('@').count() == 2
+        && email.split('@').all(|part| !part.is_empty())
+}
+
+fn validate_registration(input: &Register) -> ApiResult<()> {
+    if !is_valid_email(&input.email) {
+        return Err(bad("enter a valid email address"));
+    }
+    if input.password.len() < 12 {
+        return Err(bad("use a password with at least 12 characters"));
+    }
+    if input.display_name.trim().is_empty()
+        || input.display_name.trim().len() > MAX_DISPLAY_NAME_LENGTH
+    {
+        return Err(bad("display name must be between 1 and 80 characters"));
+    }
+    Ok(())
+}
+
+fn validate_profile(input: &UpdateProfile) -> ApiResult<()> {
+    if input.display_name.trim().is_empty()
+        || input.display_name.trim().len() > MAX_DISPLAY_NAME_LENGTH
+    {
+        return Err(bad("display name must be between 1 and 80 characters"));
+    }
+    if input.bio.len() > MAX_BIO_LENGTH {
+        return Err(bad("bio must be 2,000 characters or fewer"));
+    }
+    if input
+        .wallet_address
+        .as_ref()
+        .is_some_and(|address| address.len() > MAX_WALLET_ADDRESS_LENGTH)
+    {
+        return Err(bad("wallet address must be 64 characters or fewer"));
+    }
+    Ok(())
+}
+
+fn validate_agreement(input: &CreateAgreement, creator_id: Uuid) -> ApiResult<()> {
+    if input.title.trim().is_empty() || input.title.trim().len() > MAX_AGREEMENT_TITLE_LENGTH {
+        return Err(bad("agreement title must be between 1 and 160 characters"));
+    }
+    if input.description.len() > MAX_AGREEMENT_DESCRIPTION_LENGTH {
+        return Err(bad(
+            "agreement description must be 5,000 characters or fewer",
+        ));
+    }
+    if creator_id == input.participant_id {
+        return Err(bad(
+            "choose another user's ID; you cannot create an agreement with yourself",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_review(input: &CreateReview) -> ApiResult<()> {
+    if !(1..=5).contains(&input.rating)
+        || input.review_text.trim().is_empty()
+        || input.review_text.trim().len() > MAX_REVIEW_LENGTH
+    {
+        return Err(bad(
+            "rating must be 1 through 5 and review text must be between 1 and 2,000 characters",
+        ));
+    }
+    Ok(())
+}
+
+fn cors_layer() -> CorsLayer {
+    let origin = env::var("FRONTEND_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".into());
+    let origin =
+        HeaderValue::from_str(&origin).expect("FRONTEND_ORIGIN must be a valid HTTP origin");
+    CorsLayer::new()
+        .allow_origin(origin)
+        .allow_methods([Method::GET, Method::POST, Method::PUT])
+        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+}
+
+async fn security_headers(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    headers.insert(X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    headers.insert(
+        CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
+    );
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
 fn internal(_: sqlx::Error) -> ApiError {
     ApiError(
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -184,6 +293,10 @@ async fn main() {
         .init();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must point to PostgreSQL");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    assert!(
+        jwt_secret.len() >= 32,
+        "JWT_SECRET must be at least 32 characters long"
+    );
     let db = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
@@ -223,7 +336,9 @@ async fn main() {
         .route("/reviews", get(list_reviews).post(create_review))
         .route("/reviews/{id}/verification", get(verification))
         .with_state(state)
-        .layer(CorsLayer::permissive())
+        .layer(DefaultBodyLimit::max(16 * 1024))
+        .layer(middleware::map_response(security_headers))
+        .layer(cors_layer())
         .layer(TraceLayer::new_for_http());
     let addr = SocketAddr::from((
         [127, 0, 0, 1],
@@ -245,9 +360,7 @@ async fn register(
     State(s): State<AppState>,
     Json(input): Json<Register>,
 ) -> ApiResult<(StatusCode, Json<AuthResponse>)> {
-    if input.password.len() < 12 || input.display_name.trim().is_empty() {
-        return Err(bad("use a 12-character password and a display name"));
-    }
+    validate_registration(&input)?;
     let email = input.email.trim().to_lowercase();
     let id = Uuid::new_v4();
     let password_hash =
@@ -352,6 +465,7 @@ async fn update_profile(
             "you can only update your own profile".into(),
         ));
     }
+    validate_profile(&input)?;
     sqlx::query_as("UPDATE profiles SET display_name=$1,bio=$2,wallet_address=$3,updated_at=now() WHERE user_id=$4 RETURNING user_id,display_name,bio,wallet_address").bind(input.display_name.trim()).bind(input.bio.trim()).bind(input.wallet_address).bind(user_id).fetch_one(&s.db).await.map(Json).map_err(internal)
 }
 async fn create_agreement(
@@ -360,14 +474,7 @@ async fn create_agreement(
     Json(input): Json<CreateAgreement>,
 ) -> ApiResult<(StatusCode, Json<Agreement>)> {
     let creator_id = actor(&headers, &s)?;
-    if input.title.trim().is_empty() {
-        return Err(bad("an agreement title is required"));
-    }
-    if creator_id == input.participant_id {
-        return Err(bad(
-            "choose another user's ID; you cannot create an agreement with yourself",
-        ));
-    }
+    validate_agreement(&input, creator_id)?;
     let participant_exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id=$1)")
             .bind(input.participant_id)
@@ -435,11 +542,7 @@ async fn create_review(
     Json(input): Json<CreateReview>,
 ) -> ApiResult<(StatusCode, Json<Review>)> {
     let reviewer = actor(&headers, &s)?;
-    if !(1..=5).contains(&input.rating) || input.review_text.trim().is_empty() {
-        return Err(bad(
-            "rating must be 1 through 5 and review text is required",
-        ));
-    }
+    validate_review(&input)?;
     let agreement = sqlx::query_as::<_, (Uuid, Uuid, String)>(
         "SELECT creator_id,participant_id,status FROM agreements WHERE id=$1",
     )
@@ -535,4 +638,124 @@ async fn list_reviews(
 }
 async fn verification(State(s): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<Json<Review>> {
     sqlx::query_as("SELECT id,agreement_id,reviewer_id,reviewed_user_id,rating,review_text,verification_status,blockchain_transaction,created_at FROM reviews WHERE id=$1").bind(id).fetch_optional(&s.db).await.map_err(internal)?.map(Json).ok_or_else(|| ApiError(StatusCode::NOT_FOUND,"review not found".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn error_message(result: ApiResult<()>) -> String {
+        match result {
+            Ok(()) => panic!("expected validation to fail"),
+            Err(ApiError(_, message)) => message,
+        }
+    }
+
+    #[test]
+    fn registration_requires_valid_email_password_and_display_name() {
+        let valid = Register {
+            email: "member@example.com".into(),
+            password: "a-long-development-password".into(),
+            display_name: "Trust Member".into(),
+        };
+        assert!(validate_registration(&valid).is_ok());
+
+        let invalid_email = Register {
+            email: "not-an-email".into(),
+            ..valid
+        };
+        assert_eq!(
+            error_message(validate_registration(&invalid_email)),
+            "enter a valid email address"
+        );
+    }
+
+    #[test]
+    fn agreement_cannot_target_creator_or_exceed_limits() {
+        let creator = Uuid::new_v4();
+        let self_targeted = CreateAgreement {
+            participant_id: creator,
+            title: "Website redesign".into(),
+            description: "A scoped project".into(),
+        };
+        assert!(
+            error_message(validate_agreement(&self_targeted, creator))
+                .contains("cannot create an agreement with yourself")
+        );
+
+        let too_long = CreateAgreement {
+            participant_id: Uuid::new_v4(),
+            title: "x".repeat(MAX_AGREEMENT_TITLE_LENGTH + 1),
+            description: String::new(),
+        };
+        assert!(error_message(validate_agreement(&too_long, creator)).contains("1 and 160"));
+    }
+
+    #[test]
+    fn review_requires_valid_rating_and_bounded_text() {
+        let invalid_rating = CreateReview {
+            agreement_id: Uuid::new_v4(),
+            rating: 6,
+            review_text: "Excellent work".into(),
+        };
+        assert!(validate_review(&invalid_rating).is_err());
+
+        let too_long = CreateReview {
+            agreement_id: Uuid::new_v4(),
+            rating: 5,
+            review_text: "x".repeat(MAX_REVIEW_LENGTH + 1),
+        };
+        assert!(validate_review(&too_long).is_err());
+    }
+
+    #[test]
+    fn profile_validation_bounds_public_fields() {
+        let valid = UpdateProfile {
+            display_name: "Trust Member".into(),
+            bio: "A short public biography.".into(),
+            wallet_address: Some("ExampleWalletAddress".into()),
+        };
+        assert!(validate_profile(&valid).is_ok());
+
+        let oversized_bio = UpdateProfile {
+            bio: "x".repeat(MAX_BIO_LENGTH + 1),
+            ..valid
+        };
+        assert!(error_message(validate_profile(&oversized_bio)).contains("2,000"));
+    }
+
+    #[tokio::test]
+    async fn security_headers_prevent_embedding_and_content_sniffing() {
+        let response = security_headers(StatusCode::OK.into_response()).await;
+        let headers = response.headers();
+        assert_eq!(headers.get(X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
+        assert_eq!(headers.get(X_FRAME_OPTIONS).unwrap(), "DENY");
+        assert_eq!(headers.get(REFERRER_POLICY).unwrap(), "no-referrer");
+        assert_eq!(headers.get(CACHE_CONTROL).unwrap(), "no-store");
+    }
+
+    #[tokio::test]
+    async fn jwt_authentication_rejects_bad_or_missing_tokens() {
+        let user_id = Uuid::new_v4();
+        let secret = "a-secure-test-secret-that-is-long-enough";
+        let state = AppState {
+            db: PgPool::connect_lazy("postgres://localhost/not_used").expect("valid lazy URL"),
+            jwt_secret: secret.into(),
+            solana: None,
+        };
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            format!("Bearer {}", token(user_id, secret))
+                .parse()
+                .unwrap(),
+        );
+        assert!(matches!(actor(&headers, &state), Ok(id) if id == user_id));
+
+        headers.insert(AUTHORIZATION, "Bearer invalid".parse().unwrap());
+        assert!(matches!(
+            actor(&headers, &state),
+            Err(ApiError(StatusCode::UNAUTHORIZED, _))
+        ));
+    }
 }

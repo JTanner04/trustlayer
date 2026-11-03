@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 import { PreviewProvider, usePreview } from "./preview-context";
 import { Avatar, Icon, type IconName } from "./ui";
 import s from "./workspace.module.css";
@@ -14,8 +14,20 @@ const links: { href: string; label: string; icon: IconName }[] = [
 ];
 function Workspace({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const router = useRouter();
   const { profile, agreements } = usePreview();
+  const [signingOut, setSigningOut] = useState(false);
   const current = links.find((l) => path.startsWith(l.href));
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  }
   return (
     <div className={s.app}>
       <a className={s.skip} href="#workspace-content">
@@ -71,6 +83,10 @@ function Workspace({ children }: { children: ReactNode }) {
             </span>
             <Icon name="settings" />
           </Link>
+          <button type="button" className={s.signOut} onClick={() => void signOut()} disabled={signingOut}>
+            <Icon name="back" />
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
         </div>
       </aside>
       <div className={s.workspace}>

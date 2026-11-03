@@ -23,6 +23,12 @@ To use a different API URL, create an ignored local file named `.env.local`:
 TRUSTLAYER_API_URL=http://127.0.0.1:3001
 ```
 
+Create a production build with:
+
+```bash
+npm run build
+```
+
 ## Workspace routes
 
 - `/dashboard`: overview, open work, received feedback, and reviews to write.

@@ -57,3 +57,29 @@ Authenticated list and detail routes are available for workspace integration:
 - `GET /agreements` (optional `?status=open` or `?status=completed`)
 - `GET /agreements/{id}`
 - `GET /reviews?scope=received` and `GET /reviews?scope=given`
+
+## Testing
+
+Run fast unit tests from `axum-api`:
+
+```sh
+cargo test
+```
+
+For the full two-account API workflow, start the API against a disposable local
+database **without `SOLANA_KEYPAIR_PATH` set** in one terminal, then run this in
+another:
+
+```sh
+bash scripts/test-api-flow.sh
+```
+
+The integration script registers two new accounts, verifies that completion is
+blocked before acceptance, accepts and completes an agreement, creates a review,
+checks duplicate-review protection, and reads the public verification record.
+
+On macOS with Xcode command-line tools, generate the backend coverage report:
+
+```sh
+bash scripts/coverage.sh
+```
