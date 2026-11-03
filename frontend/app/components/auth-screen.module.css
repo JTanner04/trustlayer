@@ -36,6 +36,12 @@
 .field input::placeholder { color: #778173; font-size: 13px; }
 .field input:hover { border-color: #aabfa2; }
 .field input:focus-visible { outline: 2px solid #416e52; outline-offset: 2px; border-color: #416e52; box-shadow: 0 0 0 4px #e7f0e2; background: white; }
+.passwordWrap { position: relative; }
+.passwordWrap input { padding-right: 50px; }
+.passwordToggle { position: absolute; top: 50%; right: 6px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; transform: translateY(-50%); transition: background 180ms, color 180ms; }
+.passwordToggle:hover { background: #eaf0e5; color: var(--ink); }
+.passwordToggle:focus-visible { outline: 2px solid #416e52; outline-offset: 1px; }
+.passwordToggle svg { width: 18px; height: 18px; }
 .submitButton { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 4px; padding: 12px; border: 1px solid #60796a; border-radius: 7px; background: #60796a; color: #fff; font-size: 13px; font-weight: 550; }
 .submitButton:not(:disabled) { cursor: pointer; transition: background 180ms, transform 180ms; }
 .submitButton:not(:disabled):hover { background: #365f4a; transform: translateY(-1px); }

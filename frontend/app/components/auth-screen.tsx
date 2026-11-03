@@ -5,7 +5,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./auth-screen.module.css";
 
-type IconName = "layers" | "arrow" | "back" | "shield";
+type IconName = "layers" | "arrow" | "back" | "shield" | "eye" | "eyeOff";
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -13,6 +13,8 @@ function Icon({ name }: { name: IconName }) {
     arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
     back: <path d="M20 12H4m6-6-6 6 6 6" />,
     shield: <><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z" /><path d="m8 12 3 3 5-6" /></>,
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
+    eyeOff: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /><path d="m4 4 16 16" /></>,
   };
 
   return (
@@ -27,6 +29,7 @@ export default function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,12 +112,17 @@ export default function AuthScreen({ mode }: { mode: "login" | "signup" }) {
               </div>
               <div className={styles.field}>
                 <label htmlFor="password">Password</label>
-                <input id="password" name="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} placeholder={isSignup ? "Create a password (12+ characters)" : "Enter your password"} minLength={isSignup ? 12 : undefined} required />
+                <div className={styles.passwordWrap}>
+                  <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} placeholder={isSignup ? "Create a password (12+ characters)" : "Enter your password"} minLength={isSignup ? 12 : undefined} required />
+                  <button type="button" className={styles.passwordToggle} onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} aria-controls={isSignup ? "password confirm-password" : "password"}>
+                    <Icon name={showPassword ? "eyeOff" : "eye"} />
+                  </button>
+                </div>
               </div>
               {isSignup && (
                 <div className={styles.field}>
                   <label htmlFor="confirm-password">Confirm password</label>
-                  <input id="confirm-password" name="confirm-password" type="password" autoComplete="new-password" placeholder="Re-enter your password" required />
+                  <input id="confirm-password" name="confirm-password" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Re-enter your password" required />
                 </div>
               )}
               {error && <p className={styles.formError} role="alert">{error}</p>}
