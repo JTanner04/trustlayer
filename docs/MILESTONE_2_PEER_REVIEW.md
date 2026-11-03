@@ -54,14 +54,24 @@ None are blocking for Milestone 2.
   if the API is unreachable; the short-secret check uses `assert!`, which
   prints a panic message rather than a clean startup error.
 
+### Post-review remediation
+
+The following low-risk findings were resolved in a follow-up patch after this
+review: A1 (72-byte bcrypt limit), A2 (character-based user-facing length
+limits), A3 (Solana public-key validation), and A4 (password, missing/expired
+JWT, and CSP-header test assertions). Rust tests and Clippy were rerun after
+the remediation. The non-blocking HTTP-status and startup-message nits remain
+documented for a future release.
+
 Reviewer sign-off: Jailin West (JW)
 
 ## Review B - Jailin's changes
 
 - Author: Jailin West
-- Reviewer: **[Jeremiah: add name]**
-- Date: **[add date]**
-- Commit/PR reviewed: **[add commit hash or pull-request URL]**
+- Reviewer: Jeremiah Tanner
+- Human sign-off: **JT**
+- Date: November 2, 2026
+- Commit/PR reviewed: `4654899` ("milestone-2: JW's additions + PR review")
 
 ### Changes submitted for review
 
@@ -81,15 +91,27 @@ pass with no errors or warnings.
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| Responsive layout and accessibility | [ ] Pass | |
-| API integration and sign-in/sign-out behavior | [ ] Pass | |
-| Public profile and verification UI | [ ] Pass | |
-| Frontend build/type/lint results | [ ] Pass | |
-| Documentation and no exposed sensitive data | [ ] Pass | |
+| Responsive layout and accessibility | [x] Pass with evidence | Partner-recorded desktop, tablet, and mobile Chromium screenshots are present under `docs/screenshots/`; CSS breakpoint behavior and semantic labels were reviewed. |
+| API integration and sign-in/sign-out behavior | [x] Pass with note | Server-side missing-cookie redirect and client-side 401 redirect were reviewed. The seed script uses API routes so it preserves normal password hashing/validation. See B1. |
+| Public profile and verification UI | [x] Pass | Public profile route compiles in the production build; screenshots cover all three viewport sizes. |
+| Frontend build/type/lint results | [x] Pass | `npm run build`, `npx tsc --noEmit`, and `npm run lint` passed on November 2, 2026. |
+| Documentation and no exposed sensitive data | [x] Pass | Tracked-file scan found only `.env.example` templates; no keypair, private-key, or real secret was found. |
 
-Findings/resolution: **[add findings or “No blocking findings.”]**
+### Findings
 
-Reviewer sign-off: **[add name/initials]**
+None are blocking for Milestone 2.
+
+- **B1 - Partially seeded databases need manual cleanup (low).** The seed script
+  exits safely when Alice already exists, but a prior interrupted run could
+  theoretically leave only Alice present; rerunning then exits before Bob is
+  created. Run it against a fresh local database as documented, or remove the
+  partial demo account before retrying. The documented normal first-run and
+  full-rerun paths work as intended.
+- **B2 - Demo credentials are intentionally public (informational).** The
+  fixed credentials are only for local demonstration accounts. They must never
+  be used for a real deployment or production account.
+
+Reviewer sign-off: Jeremiah Tanner (JT)
 
 ## Cross-viewport testing evidence
 

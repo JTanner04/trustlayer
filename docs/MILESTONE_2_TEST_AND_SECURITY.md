@@ -38,7 +38,7 @@ The unit suite verifies:
 | JWT authentication | Accepts a valid signed token and rejects a malformed bearer token. |
 | Security headers | Verifies anti-framing, anti-content-sniffing, referrer, and no-store headers. |
 
-The measured backend coverage is **32.11% lines** and **29.63% functions**,
+The measured backend coverage is **37.40% lines** and **30.00% functions**,
 meeting the documented 30% Milestone 2 baseline target. See the coverage report
 for the command, scope, and target justification.
 

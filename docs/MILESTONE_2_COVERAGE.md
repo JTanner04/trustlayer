@@ -4,7 +4,7 @@
 
 | Scope | Line coverage | Function coverage | Region coverage |
 | --- | ---: | ---: | ---: |
-| `axum-api/src/main.rs` | **32.11%** | **29.63%** | **30.16%** |
+| `axum-api/src/main.rs` | **37.40%** | **30.00%** | **36.16%** |
 
 Measurement date: November 2, 2026.
 
@@ -31,12 +31,13 @@ bash scripts/coverage.sh
 
 ## Test inventory
 
-- Registration email/password/display-name validation
+- Registration email/password/display-name validation, including bcrypt's
+  72-byte maximum password input
 - Agreement title limits and self-agreement prevention
 - Review rating/text validation
-- Profile field limits
-- JWT acceptance and malformed-token rejection
-- Security-header middleware behavior
+- Profile field limits and Solana wallet public-key format
+- JWT acceptance plus malformed, missing, and expired-token rejection
+- Security-header middleware behavior, including CSP
 
 The full workflow is additionally covered by
 `axum-api/scripts/test-api-flow.sh` against a disposable PostgreSQL database.

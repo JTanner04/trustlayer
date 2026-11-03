@@ -133,7 +133,7 @@ Also start the API with `JWT_SECRET=short` and confirm it exits with
 | --- | --- |
 | QA plan and code-review checklist | [MILESTONE_2_TEST_AND_SECURITY.md](MILESTONE_2_TEST_AND_SECURITY.md) |
 | Unit tests | `axum-api/src/main.rs` (`mod tests`) |
-| Coverage report and justified target | [MILESTONE_2_COVERAGE.md](MILESTONE_2_COVERAGE.md) — 32.11% lines vs. 30% target |
+| Coverage report and justified target | [MILESTONE_2_COVERAGE.md](MILESTONE_2_COVERAGE.md) — 37.40% lines vs. 30% target |
 | Integration tests for main user flow | `axum-api/scripts/test-api-flow.sh` |
 | Peer code review evidence | [MILESTONE_2_PEER_REVIEW.md](MILESTONE_2_PEER_REVIEW.md) |
 | Cross-viewport testing evidence | [MILESTONE_2_PEER_REVIEW.md](MILESTONE_2_PEER_REVIEW.md#cross-viewport-testing-evidence) |

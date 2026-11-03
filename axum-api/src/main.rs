@@ -20,11 +20,12 @@ use sha2::{Digest, Sha256};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
+    pubkey::Pubkey,
     signature::{Signer, read_keypair_file},
     transaction::Transaction,
 };
 use sqlx::{FromRow, PgPool, postgres::PgPoolOptions};
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, str::FromStr};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use uuid::Uuid;
 
@@ -150,6 +151,7 @@ fn bad(message: impl Into<String>) -> ApiError {
 }
 
 const MAX_EMAIL_LENGTH: usize = 254;
+const MAX_PASSWORD_BYTES: usize = 72;
 const MAX_DISPLAY_NAME_LENGTH: usize = 80;
 const MAX_BIO_LENGTH: usize = 2_000;
 const MAX_WALLET_ADDRESS_LENGTH: usize = 64;
@@ -159,7 +161,7 @@ const MAX_REVIEW_LENGTH: usize = 2_000;
 
 fn is_valid_email(email: &str) -> bool {
     let email = email.trim();
-    email.len() <= MAX_EMAIL_LENGTH
+    email.chars().count() <= MAX_EMAIL_LENGTH
         && email.contains('@')
         && email.split('@').count() == 2
         && email.split('@').all(|part| !part.is_empty())
@@ -169,11 +171,11 @@ fn validate_registration(input: &Register) -> ApiResult<()> {
     if !is_valid_email(&input.email) {
         return Err(bad("enter a valid email address"));
     }
-    if input.password.len() < 12 {
-        return Err(bad("use a password with at least 12 characters"));
+    if input.password.chars().count() < 12 || input.password.len() > MAX_PASSWORD_BYTES {
+        return Err(bad("use a password between 12 characters and 72 bytes"));
     }
     if input.display_name.trim().is_empty()
-        || input.display_name.trim().len() > MAX_DISPLAY_NAME_LENGTH
+        || input.display_name.trim().chars().count() > MAX_DISPLAY_NAME_LENGTH
     {
         return Err(bad("display name must be between 1 and 80 characters"));
     }
@@ -182,28 +184,30 @@ fn validate_registration(input: &Register) -> ApiResult<()> {
 
 fn validate_profile(input: &UpdateProfile) -> ApiResult<()> {
     if input.display_name.trim().is_empty()
-        || input.display_name.trim().len() > MAX_DISPLAY_NAME_LENGTH
+        || input.display_name.trim().chars().count() > MAX_DISPLAY_NAME_LENGTH
     {
         return Err(bad("display name must be between 1 and 80 characters"));
     }
-    if input.bio.len() > MAX_BIO_LENGTH {
+    if input.bio.chars().count() > MAX_BIO_LENGTH {
         return Err(bad("bio must be 2,000 characters or fewer"));
     }
-    if input
-        .wallet_address
-        .as_ref()
-        .is_some_and(|address| address.len() > MAX_WALLET_ADDRESS_LENGTH)
-    {
-        return Err(bad("wallet address must be 64 characters or fewer"));
+    if let Some(address) = input.wallet_address.as_ref() {
+        let address = address.trim();
+        if address.chars().count() > MAX_WALLET_ADDRESS_LENGTH || Pubkey::from_str(address).is_err()
+        {
+            return Err(bad("wallet address must be a valid Solana public key"));
+        }
     }
     Ok(())
 }
 
 fn validate_agreement(input: &CreateAgreement, creator_id: Uuid) -> ApiResult<()> {
-    if input.title.trim().is_empty() || input.title.trim().len() > MAX_AGREEMENT_TITLE_LENGTH {
+    if input.title.trim().is_empty()
+        || input.title.trim().chars().count() > MAX_AGREEMENT_TITLE_LENGTH
+    {
         return Err(bad("agreement title must be between 1 and 160 characters"));
     }
-    if input.description.len() > MAX_AGREEMENT_DESCRIPTION_LENGTH {
+    if input.description.chars().count() > MAX_AGREEMENT_DESCRIPTION_LENGTH {
         return Err(bad(
             "agreement description must be 5,000 characters or fewer",
         ));
@@ -219,7 +223,7 @@ fn validate_agreement(input: &CreateAgreement, creator_id: Uuid) -> ApiResult<()
 fn validate_review(input: &CreateReview) -> ApiResult<()> {
     if !(1..=5).contains(&input.rating)
         || input.review_text.trim().is_empty()
-        || input.review_text.trim().len() > MAX_REVIEW_LENGTH
+        || input.review_text.trim().chars().count() > MAX_REVIEW_LENGTH
     {
         return Err(bad(
             "rating must be 1 through 5 and review text must be between 1 and 2,000 characters",
@@ -668,6 +672,27 @@ mod tests {
             error_message(validate_registration(&invalid_email)),
             "enter a valid email address"
         );
+
+        let short_password = Register {
+            email: "member@example.com".into(),
+            password: "short".into(),
+            display_name: "Trust Member".into(),
+        };
+        assert!(error_message(validate_registration(&short_password)).contains("12 characters"));
+
+        let truncated_password = Register {
+            email: "member@example.com".into(),
+            password: "p".repeat(MAX_PASSWORD_BYTES + 1),
+            display_name: "Trust Member".into(),
+        };
+        assert!(error_message(validate_registration(&truncated_password)).contains("72 bytes"));
+
+        let missing_name = Register {
+            email: "member@example.com".into(),
+            password: "a-long-development-password".into(),
+            display_name: String::new(),
+        };
+        assert!(error_message(validate_registration(&missing_name)).contains("display name"));
     }
 
     #[test]
@@ -713,7 +738,7 @@ mod tests {
         let valid = UpdateProfile {
             display_name: "Trust Member".into(),
             bio: "A short public biography.".into(),
-            wallet_address: Some("ExampleWalletAddress".into()),
+            wallet_address: Some(Pubkey::new_unique().to_string()),
         };
         assert!(validate_profile(&valid).is_ok());
 
@@ -722,6 +747,13 @@ mod tests {
             ..valid
         };
         assert!(error_message(validate_profile(&oversized_bio)).contains("2,000"));
+
+        let invalid_wallet = UpdateProfile {
+            display_name: "Trust Member".into(),
+            bio: String::new(),
+            wallet_address: Some("not-base58!!".into()),
+        };
+        assert!(error_message(validate_profile(&invalid_wallet)).contains("valid Solana"));
     }
 
     #[tokio::test]
@@ -732,6 +764,10 @@ mod tests {
         assert_eq!(headers.get(X_FRAME_OPTIONS).unwrap(), "DENY");
         assert_eq!(headers.get(REFERRER_POLICY).unwrap(), "no-referrer");
         assert_eq!(headers.get(CACHE_CONTROL).unwrap(), "no-store");
+        assert_eq!(
+            headers.get(CONTENT_SECURITY_POLICY).unwrap(),
+            "default-src 'none'; frame-ancestors 'none'"
+        );
     }
 
     #[tokio::test]
@@ -753,6 +789,28 @@ mod tests {
         assert!(matches!(actor(&headers, &state), Ok(id) if id == user_id));
 
         headers.insert(AUTHORIZATION, "Bearer invalid".parse().unwrap());
+        assert!(matches!(
+            actor(&headers, &state),
+            Err(ApiError(StatusCode::UNAUTHORIZED, _))
+        ));
+
+        headers.clear();
+        assert!(matches!(
+            actor(&headers, &state),
+            Err(ApiError(StatusCode::UNAUTHORIZED, _))
+        ));
+
+        let expired_claims = Claims {
+            sub: user_id.to_string(),
+            exp: (Utc::now() - Duration::hours(1)).timestamp() as usize,
+        };
+        let expired = encode(
+            &Header::default(),
+            &expired_claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+        headers.insert(AUTHORIZATION, format!("Bearer {expired}").parse().unwrap());
         assert!(matches!(
             actor(&headers, &state),
             Err(ApiError(StatusCode::UNAUTHORIZED, _))
